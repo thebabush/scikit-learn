@@ -1447,11 +1447,7 @@ class TfidfTransformer(TransformerMixin, BaseEstimator):
 
             # log+1 instead of log makes sure terms with zero idf don't get
             # suppressed entirely.
-            idf = np.log(n_samples / df) + 1
-            self._idf_diag = sp.diags(idf, offsets=0,
-                                      shape=(n_features, n_features),
-                                      format='csr',
-                                      dtype=dtype)
+            self._idf = np.log(n_samples / df) + 1
 
         return self
 
@@ -1488,7 +1484,7 @@ class TfidfTransformer(TransformerMixin, BaseEstimator):
             check_is_fitted(self, attributes=["idf_"],
                             msg='idf vector is not fitted')
 
-            expected_n_features = self._idf_diag.shape[0]
+            expected_n_features = self._idf.shape[0]
             if n_features != expected_n_features:
                 raise ValueError("Input has n_features=%d while the model"
                                  " has been trained with n_features=%d" % (
@@ -1498,7 +1494,7 @@ class TfidfTransformer(TransformerMixin, BaseEstimator):
             # with CSR matrix we can safely pick-up the indices
             if copy:
                 X = X.copy()
-            X.data *= self._idf_diag.data[X.indices]
+            X.data *= self._idf[X.indices]
 
         if self.norm:
             X = normalize(X, norm=self.norm, copy=False)
@@ -1507,16 +1503,15 @@ class TfidfTransformer(TransformerMixin, BaseEstimator):
 
     @property
     def idf_(self):
-        # if _idf_diag is not set, this will raise an attribute error,
+        # if _idf is not set, this will raise an attribute error,
         # which means hasattr(self, "idf_") is False
-        return np.ravel(self._idf_diag.sum(axis=0))
+        return self._idf
 
     @idf_.setter
     def idf_(self, value):
         value = np.asarray(value, dtype=np.float64)
         n_features = value.shape[0]
-        self._idf_diag = sp.spdiags(value, diags=0, m=n_features,
-                                    n=n_features, format='csr')
+        self._idf = value
 
     def _more_tags(self):
         return {'X_types': 'sparse'}
